@@ -1,0 +1,36 @@
+import arcpy
+import os
+
+# Folder where your shapefiles are stored (updated to correct location)
+folder_path = r"C:\Users\MUSTAK\Downloads\Nish\OUTPUT"
+
+# Define WGS 1984 Spatial Reference (EPSG: 4326)
+wgs84 = arcpy.SpatialReference(4326)
+
+# Loop through all shapefiles in the folder
+for filename in os.listdir(folder_path):
+    if filename.endswith(".shp"):
+        shp_file = os.path.join(folder_path, filename)
+        print(f"Processing {shp_file}...")
+
+        # Add Longitude (X) and Latitude (Y) fields if they do not exist
+        fields = [f.name for f in arcpy.ListFields(shp_file)]
+        if 'Lat' not in fields:
+            arcpy.AddField_management(shp_file, "Lat", "DOUBLE")
+        if 'Long' not in fields:
+            arcpy.AddField_management(shp_file, "Long", "DOUBLE")
+
+        # Update the Latitude and Longitude fields with Y and X coordinates
+        with arcpy.da.UpdateCursor(shp_file, ["SHAPE@", "Lat", "Long"]) as cursor:
+            for row in cursor:
+                geom = row[0]
+                # Project geometry to WGS 1984 (if the shapefile is not in WGS 1984)
+                geom_wgs84 = geom.projectAs(wgs84)
+                x, y = geom_wgs84.centroid.X, geom_wgs84.centroid.Y  # Get X, Y in decimal degrees
+                row[1] = y  # Set Latitude (Y coordinate)
+                row[2] = x  # Set Longitude (X coordinate)
+                cursor.updateRow(row)
+
+        print(f"Finished processing {shp_file}")
+
+print("All shapefiles processed successfully.")
