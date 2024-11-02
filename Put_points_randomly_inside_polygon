@@ -1,0 +1,52 @@
+import arcpy
+import random
+
+# Input shapefile paths
+polygon_shp = r"C:\Users\MUSTAK\Downloads\Nish\shp\PSNEWASHOKNAGAR.shp"  # Polygon shapefile
+points_shp = r"C:\Users\MUSTAK\Downloads\Nish\Nish_1\NEW ASHOK NAGR\NEW ASHOK NAGAR_F.shp"  # Points shapefile (to modify)
+
+# Set environment
+arcpy.env.overwriteOutput = True
+
+# Get the polygon geometry (assuming only one polygon)
+with arcpy.da.SearchCursor(polygon_shp, ["SHAPE@"]) as cursor:
+    for row in cursor:
+        polygon = row[0]  # Get the polygon geometry
+
+# Function to generate random points within the polygon's bounding box
+def generate_random_point_within_polygon(polygon):
+    # Get the extent (bounding box) of the polygon
+    extent = polygon.extent
+
+    # Generate random x and y coordinates within the bounding box
+    x_random = random.uniform(extent.XMin, extent.XMax)
+    y_random = random.uniform(extent.YMin, extent.YMax)
+
+    # Create a point geometry from the random coordinates
+    random_point = arcpy.PointGeometry(arcpy.Point(x_random, y_random))
+
+    # Check if the random point lies inside the polygon
+    if polygon.contains(random_point):
+        return random_point
+    else:
+        # If not, recursively try again until a valid point is found
+        return generate_random_point_within_polygon(polygon)
+
+# Start an update cursor to modify the points shapefile in place
+with arcpy.da.UpdateCursor(points_shp, ["SHAPE@XY"]) as cursor:
+    for row in cursor:
+        point_coords = row[0]  # Get the point coordinates (X, Y)
+        point_geometry = arcpy.PointGeometry(arcpy.Point(*point_coords))  # Create point geometry from coordinates
+
+        # Check if the point is inside the polygon
+        if polygon.contains(point_geometry):
+            # If the point is inside, no need to move it
+            continue
+        else:
+            # If the point is outside, move it to a random location inside the polygon
+            random_point = generate_random_point_within_polygon(polygon)
+            
+            # Update the point's coordinates to the new random point
+            cursor.updateRow([(random_point.centroid.X, random_point.centroid.Y)])
+
+print("Points outside the polygon have been randomly moved inside.")
